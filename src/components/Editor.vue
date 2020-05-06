@@ -1,5 +1,6 @@
 <template>
   <div class="editor">
+    <div class="alert alert-danger" role="alert" v-if="show === true">削除しました。</div>
     <h1>エディター画面</h1>
     <span class="mr-3">{{ user.displayName }}</span>
 
@@ -38,6 +39,7 @@ export default {
   props: ["user"],
   data() {
     return {
+      show: false,
       memos: [
         {
           markdown: ""
@@ -73,6 +75,13 @@ export default {
     document.onKeydown = null;
   },
   methods: {
+    // 削除時のフラッシュメッセージを3秒表示
+    showFlash() {
+      this.show = true;
+      setTimeout(() => {
+        this.show = false;
+      }, 3000);
+    },
     logout: function() {
       firebase.auth().signOut();
     },
@@ -98,6 +107,7 @@ export default {
       if (this.selectedIndex > 0) {
         this.selectedIndex--;
       }
+      this.showFlash();
     },
     // FirebaseのDBに保存する
     saveMemos: function() {
@@ -105,6 +115,7 @@ export default {
         .database()
         .ref("memos/" + this.user.uid)
         .set(this.memos);
+      alert("メッセージを保存しました。");
     }
   }
 };

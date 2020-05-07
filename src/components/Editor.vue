@@ -16,27 +16,43 @@
         <p class="memoTitle">{{ displayTitle(memo.markdown) }}</p>
       </div>
       <button class="addMemoBtn" @click="addMemo">メモの追加</button>
-      <button class="deleteMemoBtn" v-if="memos.length > 1" @click="deleteMemo">選択中のメモの削除</button>
+      <!-- <button class="deleteMemoBtn" v-if="memos.length > 1" @click="deleteMemo">選択中のメモの削除</button> -->
+      <button class="deleteMemoBtn" v-if="memos.length > 1" @click="openModal">選択中のメモの削除</button>
       <button class="saveMemosBtn" @click="saveMemos">メモの保存</button>
     </div>
     <div class="editorWrapper mb-5">
-      <!-- <textarea class="markdown" v-model="memos[selectedIndex].markdown"></textarea> -->
-      <textarea
+      <textarea class="markdown" v-model="memos[selectedIndex].markdown"></textarea>
+      <!-- <textarea
         class="markdown"
         v-on:keydown.ctrl.78="saveMemos"
         v-model="memos[selectedIndex].markdown"
-      ></textarea>
+      ></textarea>-->
       <div class="preview markdown-body" v-html="preview()"></div>
+    </div>
+    <!-- 削除時のモーダル確認表示 -->
+    <div class="modal-window">
+      <Modal @close="closeModal" v-if="modal">
+        <!-- defaultスロットコンテンツ -->
+        <h3>{{ this.displayTitle(this.memos[this.selectedIndex].markdown) }}</h3>
+        <p>を削除してよろしいですか。</p>
+        <!-- footer スロットコンテンツ -->
+        <template slot="footer">
+          <button class="btn btn-danger" @click="deleteMemo">消去</button>
+          <button class="btn" @click="closeModal">キャンセル</button>
+        </template>
+      </Modal>
     </div>
   </div>
 </template>
 
 <script>
 import marked from "marked";
+import Modal from "./Modal.vue";
 
 export default {
   name: "editor",
   props: ["user"],
+  components: { Modal },
   data() {
     return {
       show: false,
@@ -45,7 +61,9 @@ export default {
           markdown: ""
         }
       ],
-      selectedIndex: 0
+      selectedIndex: 0,
+      // モーダル
+      modal: false
     };
   },
   // ページ読み込み時にDBから値を取得する
@@ -64,7 +82,6 @@ export default {
   mounted: function() {
     // Ctrl + S キーで保存する
     document.onkeydown = e => {
-      console.log("キーイベント" + e.key);
       if (e.key == "s" && e.ctrlKey) {
         this.saveMemos();
         return false;
@@ -75,7 +92,7 @@ export default {
     document.onKeydown = null;
   },
   methods: {
-    // 削除時のフラッシュメッセージを3秒表示
+    // 削除フラッシュメッセージを3秒表示
     showFlash() {
       this.show = true;
       setTimeout(() => {
@@ -86,14 +103,18 @@ export default {
       firebase.auth().signOut();
     },
     preview: function() {
-      return marked(this.memos[this.selectedIndex].markdown);
+      // XSS対策のsanitizeを有効化
+      return marked(this.memos[this.selectedIndex].markdown, {
+        sanitize: true
+      });
     },
     // 新規追加時の初期値
     addMemo: function() {
+      let memosMax = this.memos.length;
       this.memos.push({
         markdown: "# 無題のメモ"
       });
-      this.selectIndex++;
+      this.selectMemo(memosMax);
     },
     selectMemo: function(index) {
       this.selectedIndex = index;
@@ -103,11 +124,15 @@ export default {
       return text.split(/\n/)[0].replace(/#\s/, "");
     },
     deleteMemo: function() {
+      const title = this.displayTitle(this.memos[this.selectedIndex].markdown);
+      // confirmの確認からモーダルに変更.
       this.memos.splice(this.selectedIndex, 1);
       if (this.selectedIndex > 0) {
         this.selectedIndex--;
       }
+      // 3秒間だけフラッシュも表示
       this.showFlash();
+      this.closeModal();
     },
     // FirebaseのDBに保存する
     saveMemos: function() {
@@ -116,6 +141,13 @@ export default {
         .ref("memos/" + this.user.uid)
         .set(this.memos);
       alert("メッセージを保存しました。");
+    },
+    // モーダルの表示・非表示
+    openModal() {
+      this.modal = true;
+    },
+    closeModal() {
+      this.modal = false;
     }
   }
 };
